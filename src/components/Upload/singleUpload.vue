@@ -1,8 +1,8 @@
 <template> 
   <div>
     <el-upload
-      action="http://macro-oss.oss-cn-shenzhen.aliyuncs.com"
-      :data="dataObj"
+      :action="useOss?ossUploadUrl:minioUploadUrl"
+      :data="useOss?dataObj:null"
       list-type="picture"
       :multiple="false" :show-file-list="showFileList"
       :file-list="fileList"
@@ -59,9 +59,13 @@
           key: '',
           ossaccessKeyId: '',
           dir: '',
-          host: ''
+          host: '',
+          // callback:'',
         },
-        dialogVisible: false
+        dialogVisible: false,
+        useOss:true, //使用oss->true;使用MinIO->false
+        ossUploadUrl:'http://macro-oss.oss-cn-shenzhen.aliyuncs.com',
+        minioUploadUrl:'http://localhost:8080/minio/upload',
       };
     },
     methods: {
@@ -76,6 +80,10 @@
       },
       beforeUpload(file) {
         let _self = this;
+        if(!this.useOss){
+          //不使用oss不需要获取策略
+          return true;
+        }
         return new Promise((resolve, reject) => {
           policy().then(response => {
             _self.dataObj.policy = response.data.policy;
@@ -84,6 +92,7 @@
             _self.dataObj.key = response.data.dir + '/${filename}';
             _self.dataObj.dir = response.data.dir;
             _self.dataObj.host = response.data.host;
+            // _self.dataObj.callback = response.data.callback;
             resolve(true)
           }).catch(err => {
             console.log(err)
@@ -94,7 +103,12 @@
       handleUploadSuccess(res, file) {
         this.showFileList = true;
         this.fileList.pop();
-        this.fileList.push({name: file.name, url: this.dataObj.host + '/' + this.dataObj.dir + '/' + file.name});
+        let url = this.dataObj.host + '/' + this.dataObj.dir + '/' + file.name;
+        if(!this.useOss){
+          //不使用oss直接获取图片路径
+          url = res.data.url;
+        }
+        this.fileList.push({name: file.name, url: url});
         this.emitInput(this.fileList[0].url);
       }
     }
